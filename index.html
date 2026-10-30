@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI PPT Studio · 用一句话生成一份能讲的 PPT</title>
+<meta name="description" content="输入主题，AI 生成大纲与版面，实时预览，一键导出可编辑的 .pptx。纯前端，可离线，可自行部署。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235B4BFF'/%3E%3Cpath d='M9 22V10h6.2a4 4 0 010 8H12' stroke='%23fff' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="assets/css/app.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M10 22.5V9.5h5.6a3.9 3.9 0 010 7.8H13" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <div class="brand-text">
+      <strong>AI PPT Studio</strong>
+      <small>一句话 → 大纲 → 版面 → .pptx</small>
+    </div>
+  </div>
+
+  <input id="deckTitle" class="deck-title" type="text" value="未命名演示" aria-label="演示标题" />
+
+  <div class="topbar-actions">
+    <button class="btn ghost" id="btnSample" title="载入示例">示例</button>
+    <button class="btn ghost" id="btnImport" title="导入项目 JSON">导入</button>
+    <button class="btn ghost" id="btnExportJson" title="导出项目 JSON">导出</button>
+    <button class="btn ghost" id="btnPresent" title="全屏演示（F5）">演示</button>
+    <button class="btn primary" id="btnDownload">下载 PPTX</button>
+    <input id="fileInput" type="file" accept=".json,application/json" hidden />
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- 左栏 -->
+  <aside class="panel left">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="ai">AI 生成</button>
+      <button class="tab" data-tab="doc">文稿转换</button>
+      <button class="tab" data-tab="outline">大纲</button>
+      <button class="tab" data-tab="design">设计</button>
+    </nav>
+
+    <section class="tab-body" data-panel="ai">
+      <label class="field">
+        <span>主题 / 一句话说明</span>
+        <textarea id="gTopic" rows="3" placeholder="例如：县域文旅如何借短视频破圈&#10;或：Q3 增长复盘与 Q4 打法">AI 如何重塑企业知识生产</textarea>
+      </label>
+      <div class="row2">
+        <label class="field">
+          <span>场合</span>
+          <select id="gScene">
+            <option>工作汇报</option>
+            <option>项目路演</option>
+            <option>产品发布</option>
+            <option>培训分享</option>
+            <option>方案提案</option>
+            <option>学术答辩</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>页数</span>
+          <select id="gPages">
+            <option value="8">约 8 页 · 短</option>
+            <option value="12" selected>约 12 页 · 标准</option>
+            <option value="16">约 16 页 · 完整</option>
+            <option value="20">约 20 页 · 详细</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>听众</span>
+        <input id="gAudience" type="text" value="业务负责人" />
+      </label>
+      <label class="field">
+        <span>补充要求（可选）</span>
+        <input id="gExtra" type="text" placeholder="例如：突出成本优势；给出三个落地案例" />
+      </label>
+
+      <div class="btn-row">
+        <button class="btn primary block" id="btnGenerate">AI 生成大纲</button>
+      </div>
+      <button class="btn block" id="btnLocal">用本地模板生成</button>
+
+      <details class="api-box" id="apiBox">
+        <summary>API 设置 <span class="dot" id="apiDot" title="未配置"></span></summary>
+        <p class="hint">兼容 OpenAI 接口格式，Key 只保存在本机浏览器。</p>
+        <label class="field"><span>接口地址</span><input id="cfgBase" type="text" placeholder="https://api.deepseek.com/v1" /></label>
+        <label class="field"><span>模型</span><input id="cfgModel" type="text" placeholder="deepseek-chat" /></label>
+        <label class="field"><span>API Key</span><input id="cfgKey" type="password" placeholder="sk-..." /></label>
+        <div class="btn-row">
+          <button class="btn small" id="btnSaveCfg">保存</button>
+          <button class="btn small ghost" id="btnClearCfg">清除</button>
+        </div>
+        <p class="hint small" id="apiHint">未配置时自动使用本地模板生成，仍然可以导出。</p>
+      </details>
+    </section>
+
+    <section class="tab-body hidden" data-panel="doc">
+      <p class="hint">把 Markdown 或长文粘进来，自动拆成页面。<code>#</code> 一级标题成章，<code>##</code> 成页，<code>-</code> 为要点，<code>&gt;</code> 为金句。</p>
+      <textarea id="docText" class="doc-text" rows="14" placeholder="# 年度经营计划&#10;&#10;## 回顾：三条主线&#10;- 收入：同比增长 32%&#10;- 效率：人效提升 18%&#10;&#10;## 目标&#10;- 规模：进入华东前五&#10;- 质量：续约率 90%+"></textarea>
+      <div class="btn-row">
+        <button class="btn primary block" id="btnConvert">转换并生成</button>
+      </div>
+    </section>
+
+    <section class="tab-body hidden" data-panel="outline">
+      <div class="outline-head">
+        <span>共 <b id="slideCount">0</b> 页</span>
+        <div class="add-wrap">
+          <button class="btn small" id="btnAdd">＋ 新建页</button>
+          <div class="add-menu hidden" id="addMenu"></div>
+        </div>
+      </div>
+      <ul class="outline-list" id="outlineList"></ul>
+    </section>
+
+    <section class="tab-body hidden" data-panel="design">
+      <p class="label">配色主题</p>
+      <div class="theme-grid" id="themeGrid"></div>
+      <p class="label">字体</p>
+      <select id="fontSelect" class="full"></select>
+      <p class="label">整份设置</p>
+      <label class="field"><span>标题</span><input id="metaTitle" type="text" /></label>
+      <label class="field"><span>副标题</span><input id="metaSubtitle" type="text" /></label>
+      <div class="btn-row">
+        <button class="btn small ghost" id="btnReset">清空并重来</button>
+      </div>
+    </section>
+  </aside>
+
+  <!-- 中间舞台 -->
+  <main class="stage-wrap">
+    <div class="stage-toolbar">
+      <div class="nav">
+        <button class="icon-btn" id="btnPrev" title="上一页（←）">‹</button>
+        <span class="page-indicator"><b id="pageNow">1</b> / <span id="pageTotal">1</span></span>
+        <button class="icon-btn" id="btnNext" title="下一页（→）">›</button>
+      </div>
+      <div class="stage-title" id="stageTitle">未命名页面</div>
+      <div class="nav">
+        <button class="icon-btn" id="btnToggleInspector" title="本页内容">编辑</button>
+        <button class="icon-btn" id="btnDup" title="复制本页">复制</button>
+        <button class="icon-btn danger" id="btnDel" title="删除本页">删除</button>
+      </div>
+    </div>
+
+    <div class="stage-host" id="stageHost">
+      <div class="slide-frame" id="slideFrame">
+        <div class="stage-inner" id="stageInner"></div>
+      </div>
+      <div class="empty-state" id="emptyState">
+        <h2>从一个主题开始</h2>
+        <p>左侧输入主题，点「AI 生成大纲」；也可以直接用「本地模板」或粘贴文稿。</p>
+      </div>
+    </div>
+
+    <div class="thumb-strip" id="thumbStrip"></div>
+  </main>
+
+  <!-- 右栏检查器 -->
+  <aside class="panel right" id="inspector">
+    <div class="inspector-head">
+      <h3>本页内容</h3>
+      <button class="icon-btn" id="btnCloseInspector" title="收起">×</button>
+    </div>
+    <div class="inspector-body" id="inspectorBody"></div>
+  </aside>
+
+</div>
+
+<!-- 全屏演示 -->
+<div class="present" id="present" hidden>
+  <div class="present-stage" id="presentStage"></div>
+  <div class="present-bar">
+    <span id="presentIndex">1 / 1</span>
+    <button class="icon-btn" id="presentPrev">‹</button>
+    <button class="icon-btn" id="presentNext">›</button>
+    <button class="icon-btn" id="presentExit">退出 (Esc)</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="assets/vendor/pptxgenjs/pptxgen.bundle.js"></script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/layouts.js"></script>
+<script src="assets/js/render-html.js"></script>
+<script src="assets/js/render-pptx.js"></script>
+<script src="assets/js/generator.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
